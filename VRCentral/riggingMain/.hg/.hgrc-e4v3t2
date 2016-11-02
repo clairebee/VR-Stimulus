@@ -1,0 +1,6 @@
+[paths]
+default = ssh://hg@bitbucket.org/entropymill/rigbox
+
+
+[web]
+name = rigbox

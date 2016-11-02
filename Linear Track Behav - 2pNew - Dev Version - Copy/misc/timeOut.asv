@@ -1,0 +1,31 @@
+%=========================================================================%
+%                            individual states are
+%sessionStart
+%prepareNextTrial
+%run
+%timeOut
+%trialEnd
+%enOfExperiment
+%=========================================================================%
+
+function timeOut
+
+global MYSCREEN;
+global oBeepNoise;
+
+
+fprintf(' TimeOut\n');
+
+tic;
+play(oBeepNoise);
+
+while toc<EXP.
+% clear screen
+Screen('FillRect', MYSCREEN.windowPtr(1), MYSCREEN.grayIndex);	% sync square off
+Screen('Flip', MYSCREEN.windowPtr(1));
+
+playSound('timeOut');
+ return;
+
+% fhandle = @trialEnd;
+% end

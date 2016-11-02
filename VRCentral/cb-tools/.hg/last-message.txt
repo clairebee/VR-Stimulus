@@ -1,0 +1,1 @@
+fix new tick labels on current rather than specified axes

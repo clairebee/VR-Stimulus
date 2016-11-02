@@ -1,0 +1,313 @@
+function getTrajectory(dbx, X, Y, Z, T, rigInfo, hwInfo, expInfo)
+
+global TRIAL
+% global EXP
+global TRAJ
+global rewStatus
+% global REPLAY
+% global EYEPort
+
+global OFFLINE
+global animalName
+global dateStr
+global sessionName
+global currTrial
+global blank_screen
+global blank_screen_count
+global t1
+global count
+global reset_textures
+global reward_active
+global runTimeOut
+% global session
+
+k = expInfo.EXP;
+corner = 0;
+changeCount = 0;
+
+if strcmp(expInfo.EXP.trajDir,'cw')
+    t_start = expInfo.EXP.delta;
+    t_end   = expInfo.EXP.l.*TRIAL.trialRL(currTrial) - expInfo.EXP.delta;
+elseif strcmp(expInfo.EXP.trajDir,'ccw')
+    t_start = expInfo.EXP.l.*TRIAL.trialRL(currTrial) - expInfo.EXP.delta;
+    t_end   = expInfo.EXP.delta;
+end
+
+if expInfo.REPLAY
+    
+    % if replay just get the position parameters and then check for the
+    % reward, which is not in the original
+    % **** SHOULD CHANGE REWARDING PROCEDURE ***
+    %     display(['Curr trial : ' num2str(currTrial) ', Time : ' num2str(TRIAL.time(currTrial,count))]);
+    %     (TRIAL.time(currTrial,count) == 0 && TRIAL.time(currTrial+1,2) == 0)
+    if strcmp(expInfo.EXP.trajDir,'cw')
+        if reward_active
+            
+            if (abs(TRAJ - TRIAL.trialRewPos(currTrial)) < expInfo.EXP.rew_tol && TRIAL.lick(currTrial,count))
+                if (TRIAL.trialActive(currTrial)) || ((~TRIAL.trialActive(currTrial)) && expInfo.EXP.PtoA)
+                    giveReward(count,'ACTIVE' ,currTrial, 1);
+                    reward_active = 0;
+                    TRIAL.trialOutcome(currTrial) = 2;
+                end
+            elseif (~TRIAL.trialActive(currTrial))
+                if TRAJ >= TRIAL.trialRewPos(currTrial)
+                    giveReward(count,'PASSIVE' ,currTrial, 1);
+                    reward_active = 0;
+                    TRIAL.trialOutcome(currTrial) = 1;
+                end
+            end
+        end
+    elseif strcmp(expInfo.EXP.trajDir,'ccw') %TRIAL.trialActive(currTrial) TRIAL.trialRewPos(currTrial)
+        if reward_active
+            
+            if (abs(TRAJ - TRIAL.trialRewPos(currTrial)) < expInfo.EXP.rew_tol && TRIAL.lick(currTrial,count))
+                giveReward(count,'ACTIVE' ,currTrial, 1);
+                reward_active = 0;
+                TRIAL.trialOutcome(currTrial) = 2;
+            elseif (~TRIAL.trialActive(currTrial))
+                if (TRAJ <= (t_end - TRIAL.trialRewPos(currTrial)))
+                    giveReward(count,'PASSIVE' ,currTrial, 1);
+                    reward_active = 0;
+                    TRIAL.trialOutcome(currTrial) = 1;
+                end
+            end
+        end
+    end
+    
+    if (TRIAL.time(currTrial,count+1) ~= 0)
+        TRAJ = TRIAL.traj(currTrial,count);
+    else
+        display(['Reached traj end on trial: ' num2str(currTrial)]);
+%         rewStatus = zeros(size(expInfo.EXP.rewCorners));
+%         if (TRIAL.traj(currTrial,count-1)-t_start) > (0.9*(t_end-t_start)) % if greater than
+%             giveReward(count,'BASE' ,currTrial, 1);
+%         end
+        currTrial = currTrial + 1;
+        changeCount = 1;
+        reset_textures = 1;
+        reward_active = 1;
+        
+        blank_screen = 1;
+        blank_screen_count = 1;
+        if expInfo.EXP.changeLength
+            if expInfo.EXP.randScale
+                roomLength = expInfo.EXP.lengthSet(randi(length(expInfo.EXP.lengthSet)));
+            else
+                idx = currTrial;
+                if idx>length(expInfo.EXP.lengthSet)
+                    idx = rem(currTrial, length(expInfo.EXP.lengthSet));
+                    if idx==0
+                        idx = length(expInfo.EXP.lengthSet);
+                    end
+                end
+                roomLength = expInfo.EXP.lengthSet(idx);
+            end
+        else
+            roomLength = 1;
+        end
+        TRIAL.trialRL(currTrial) = roomLength;
+        
+        if ~OFFLINE
+            rigInfo.sendUDPmessage(['StimEnd ' animalName ' ' dateStr ' ' sessionName ' ' num2str(currTrial) ' 1 ' num2str(round(expInfo.EXP.maxTrialDuration*10))]); %%%Check this
+            %             pnet(EYEPort, 'write',['StimEnd ' animalName ' ' dateStr ' ' sessionName ' ' num2str(currTrial) ' 1 ' num2str(round(expInfo.EXP.maxTrialDuration*10))]); %%%Check this
+            %             pnet(EYEPort, 'writePacket');
+            if rigInfo.sendTTL
+                hwInfo.session.outputSingleScan(false);
+            end
+        end
+        t1 = tic;
+    end
+    
+else
+    switch expInfo.EXP.trajDir
+        case 'cw'
+            TRAJ = TRAJ + dbx;
+        case 'ccw'
+            TRAJ = TRAJ - dbx;
+        otherwise
+            TRAJ = TRAJ + dbx;
+    end
+    
+    
+    if strcmp(expInfo.EXP.trajDir,'cw')
+        if reward_active
+            if TRIAL.lick(currTrial,count)
+                if (sum(sum(TRIAL.lick(currTrial,:) & TRIAL.traj(currTrial,:))) >= expInfo.EXP.maxBadLicks) && (TRAJ <= expInfo.EXP.punishZone)
+                    % Run the time-out sequence
+                    display(['Too many bad licks on trial: ' num2str(currTrial)]);
+                    TRIAL.trialOutcome(currTrial) = -1;
+                    runTimeOut = 1;
+                end
+            end
+            if (abs(TRAJ - TRIAL.trialRewPos(currTrial)) < expInfo.EXP.rew_tol && TRIAL.lick(currTrial,count))
+                if (TRIAL.trialActive(currTrial)) || ((~TRIAL.trialActive(currTrial)) && expInfo.EXP.PtoA)
+                    giveReward(count,'ACTIVE' ,currTrial, 1);
+                    reward_active = 0;
+                    TRIAL.trialOutcome(currTrial) = 2;
+                end
+            elseif (~TRIAL.trialActive(currTrial))
+                if TRAJ >= TRIAL.trialRewPos(currTrial)
+                    giveReward(count,'PASSIVE' ,currTrial, 1);
+                    reward_active = 0;
+                    TRIAL.trialOutcome(currTrial) = 1;
+                end
+            end     
+        end
+        if (TRAJ >= t_end || toc(t1) > expInfo.EXP.maxTrialDuration || runTimeOut)
+            if reward_active
+                TRIAL.trialOutcome(currTrial) = 0;
+            end
+            
+            runTimeOut = 0;
+            currTrial = currTrial + 1;
+            reward_active = 1;
+            changeCount = 1;
+            reset_textures = 1;
+            if expInfo.EXP.changeLength
+                if expInfo.EXP.randScale
+                    roomLength = expInfo.EXP.lengthSet(randi(length(expInfo.EXP.lengthSet)));
+                else
+                    idx = currTrial;
+                    if idx>length(expInfo.EXP.lengthSet)
+                        idx = rem(currTrial, length(expInfo.EXP.lengthSet));
+                        if idx==0
+                            idx = length(expInfo.EXP.lengthSet);
+                        end
+                    end
+                    roomLength = expInfo.EXP.lengthSet(idx);
+                end
+            else
+                roomLength = 1;
+            end
+            TRIAL.trialRL(currTrial) = roomLength;
+            if expInfo.EXP.bidirec % to go back and forth
+                expInfo.EXP.trajDir = 'ccw';
+            end
+            blank_screen = 1;
+            blank_screen_count = 1;
+            TRIAL.trialBlanks(currTrial) = expInfo.EXP.pause_frames + 120*rand(1);
+            
+            if ~OFFLINE
+                rigInfo.sendUDPmessage(['StimEnd ' animalName ' ' dateStr ' ' sessionName ' ' num2str(currTrial) ' 1 ' num2str(round(expInfo.EXP.maxTrialDuration*10))]); %%%Check this
+                %                 pnet(EYEPort, 'write',['StimEnd ' animalName ' ' dateStr ' ' sessionName ' ' num2str(currTrial) ' 1 ' num2str(round(expInfo.EXP.maxTrialDuration*10))]); %%%Check this
+                %                 pnet(EYEPort, 'writePacket');
+                if rigInfo.sendTTL
+                    hwInfo.session.outputSingleScan(false);
+                end
+            end
+            t1 = tic;
+            
+            TRIAL.nCompTraj = TRIAL.nCompTraj + 1;
+            rewStatus = zeros(size(expInfo.EXP.rewCorners));
+            
+        elseif TRAJ <= t_start
+            TRAJ = t_start;
+        end
+    elseif strcmp(expInfo.EXP.trajDir,'ccw') %TRIAL.trialActive(currTrial) TRIAL.trialRewPos(currTrial)
+%         if (TRAJ <= (t_end - TRIAL.trialRewPos(currTrial)) && ~TRIAL.trialActive(currTrial) && reward_active)
+%                 giveReward(count,'ACTIVE' ,currTrial, 1);
+%                 reward_active = 0;
+%         end
+        if reward_active
+           if TRIAL.lick(currTrial,count)
+                if (sum(sum(TRIAL.lick(currTrial,:))) >= expInfo.EXP.maxBadLicks) && (TRAJ <= expInfo.EXP.punishZone)
+                    % Run the time-out sequence
+                    display(['Too many bad licks on trial: ' num2str(currTrial)]);
+                    TRIAL.trialOutcome(currTrial) = -1;
+                    runTimeOut = 1;
+                end
+           end
+           if (abs(TRAJ - TRIAL.trialRewPos(currTrial)) < expInfo.EXP.rew_tol && TRIAL.lick(currTrial,count))
+                giveReward(count,'ACTIVE' ,currTrial, 1);
+                reward_active = 0;
+                TRIAL.trialOutcome(currTrial) = 2;
+            elseif (~TRIAL.trialActive(currTrial))
+                if (TRAJ <= (t_end - TRIAL.trialRewPos(currTrial)))
+                    giveReward(count,'PASSIVE' ,currTrial, 1);
+                    reward_active = 0;
+                    TRIAL.trialOutcome(currTrial) = 1;
+                end
+            end
+        end
+        if ((TRAJ <= t_end && ~blank_screen) || toc(t1) > expInfo.EXP.maxTrialDuration)
+%             display(['Reached end, traj = ' num2str(TRAJ) ', and t_end is: ' num2str(t_end)])
+            if reward_active
+                TRIAL.trialOutcome(currTrial) = 0;
+            end
+            
+            currTrial = currTrial + 1;
+            reward_active = 1;
+            changeCount = 1;
+            reset_textures = 1;
+            if expInfo.EXP.changeLength
+                if expInfo.EXP.randScale
+                    roomLength = expInfo.EXP.lengthSet(randi(length(expInfo.EXP.lengthSet)));
+                else
+                    idx = currTrial;
+                    if idx>length(expInfo.EXP.lengthSet)
+                        idx = rem(currTrial, length(expInfo.EXP.lengthSet));
+                        if idx==0
+                            idx = length(expInfo.EXP.lengthSet);
+                        end
+                    end
+                    roomLength = expInfo.EXP.lengthSet(idx);
+                end
+            else
+                roomLength = 1;
+            end
+            TRIAL.trialRL(currTrial) = roomLength;
+            if expInfo.EXP.bidirec % to go back and forth
+                expInfo.EXP.trajDir = 'cw';
+            end
+            blank_screen = 1;
+            blank_screen_count = 1;
+            TRIAL.trialBlanks(currTrial) = expInfo.EXP.pause_frames + 120*rand(1);
+            
+            if ~OFFLINE
+                rigInfo.sendUDPmessage(['StimEnd ' animalName ' ' dateStr ' ' sessionName ' ' num2str(currTrial) ' 1 ' num2str(round(expInfo.EXP.maxTrialDuration*10))]); %%%Check this
+                %                 pnet(EYEPort, 'write',['StimEnd ' animalName ' ' dateStr ' ' sessionName ' ' num2str(currTrial) ' 1 ' num2str(round(expInfo.EXP.maxTrialDuration*10))]); %%%Check this
+                %                 pnet(EYEPort, 'writePacket');
+                if rigInfo.sendTTL
+                    hwInfo.session.outputSingleScan(false);
+                end
+            end
+            t1 = tic;
+            
+            TRIAL.nCompTraj = TRIAL.nCompTraj + 1;
+            rewStatus = zeros(size(expInfo.EXP.rewCorners));
+            
+        elseif TRAJ > t_start
+            TRAJ = t_start;
+        end
+    end
+end
+
+if blank_screen
+    TRAJ = -1;
+end
+
+corner = 0;
+p = TRAJ;
+
+if ~expInfo.REPLAY
+    TRIAL.posdata(currTrial,count,Z) = -p;
+    TRIAL.posdata(currTrial,count,X) = 0;
+    TRIAL.posdata(currTrial,1,Y) = expInfo.EXP.c3;
+    TRIAL.posdata(currTrial,count,T) = 0;
+end
+
+TRIAL.trialIdx(currTrial,count) = TRIAL.nCompTraj;
+
+if ~expInfo.REPLAY
+    switch expInfo.EXP.trajDir
+        case 'ccw'
+            TRIAL.posdata(currTrial,count,T) =  TRIAL.posdata(currTrial,count,T) + pi;
+        otherwise
+            TRIAL.posdata(currTrial,count,T) =  TRIAL.posdata(currTrial,count,T);
+    end
+end
+if changeCount
+    count = 1;
+end
+
+% display(TRAJ)
