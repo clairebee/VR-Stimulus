@@ -96,8 +96,14 @@ if idx>length(expInfo.EXP.rew_pos)
     end
 end
 
-TRIAL.trialRewPos(runInfo.currTrial) = expInfo.EXP.rew_pos(idx);
-expInfo.EXP.punishZone = TRIAL.trialRewPos(runInfo.currTrial) - expInfo.EXP.punishLim;
+% Random or predefined reward
+if expInfo.EXP.randRewPos
+    TRIAL.trialRewPos(runInfo.currTrial) = randi([20 100],1).*TRIAL.trialRL(runInfo.currTrial); % range between 20 and 100 so not before start pos?
+else
+    TRIAL.trialRewPos(runInfo.currTrial) = expInfo.EXP.rew_pos(idx).*TRIAL.trialRL(runInfo.currTrial);    
+end
+expInfo.EXP.punishZone = TRIAL.trialRewPos(runInfo.currTrial) - expInfo.EXP.punishLim.*TRIAL.trialRL(runInfo.currTrial);
+
 % end
 VRMessage = ['Trial ' num2str(runInfo.currTrial) ...
     ', C: ' num2str(TRIAL.trialContr(runInfo.currTrial)) ...
@@ -590,8 +596,13 @@ try
                 end
             end
             
-            TRIAL.trialRewPos(runInfo.currTrial) = expInfo.EXP.rew_pos(idx).*TRIAL.trialRL(runInfo.currTrial);
+            if expInfo.EXP.randRewPos
+                TRIAL.trialRewPos(runInfo.currTrial) = randi([20 100],1).*TRIAL.trialRL(runInfo.currTrial); % range between 20 and 100 so not before start pos?
+            else
+                TRIAL.trialRewPos(runInfo.currTrial) = expInfo.EXP.rew_pos(idx).*TRIAL.trialRL(runInfo.currTrial);    
+            end
             expInfo.EXP.punishZone = TRIAL.trialRewPos(runInfo.currTrial) - expInfo.EXP.punishLim;
+            
             %             end TRIAL.trialActive(runInfo.currTrial) TRIAL.trialRewPos(runInfo.currTrial)
             p = runInfo.TRAJ;
             
