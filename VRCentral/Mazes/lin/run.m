@@ -601,7 +601,7 @@ try
             else
                 TRIAL.trialRewPos(runInfo.currTrial) = expInfo.EXP.rew_pos(idx).*TRIAL.trialRL(runInfo.currTrial);    
             end
-            expInfo.EXP.punishZone = TRIAL.trialRewPos(runInfo.currTrial) - expInfo.EXP.punishLim;
+            expInfo.EXP.punishZone = TRIAL.trialRewPos(runInfo.currTrial) - expInfo.EXP.punishLim.*TRIAL.trialRL(runInfo.currTrial);
             
             %             end TRIAL.trialActive(runInfo.currTrial) TRIAL.trialRewPos(runInfo.currTrial)
             p = runInfo.TRAJ;
